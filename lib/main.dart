@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 
 void main() => runApp(MyApp());
 
@@ -20,92 +23,202 @@ class MyApp extends StatelessWidget {
         // is not restarted.
         primarySwatch: Colors.blue,
       ),
-      home: MyHomePage(title: 'Flutter Demo Home Page'),
+      home: Scaffold(body: LocationStreamWidget())
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  MyHomePage({Key key, this.title}) : super(key: key);
 
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
-
+class LocationStreamWidget extends StatefulWidget {
   @override
-  _MyHomePageState createState() => _MyHomePageState();
+  State<LocationStreamWidget> createState() => LocationStreamState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class LocationStreamState extends State<LocationStreamWidget> {
+  StreamSubscription<Position> _positionStreamSubscription;
+  final List<Position> _positions = <Position>[];
 
-  void _incrementCounter() {
+  void _toggleListening() {
+    if (_positionStreamSubscription == null) {
+      const LocationOptions locationOptions =
+          LocationOptions(accuracy: LocationAccuracy.medium);
+      final Stream<Position> positionStream =
+          Geolocator().getPositionStream(locationOptions);
+      _positionStreamSubscription = positionStream.listen(
+          (Position position) => setState(() => _positions.add(position)));
+      _positionStreamSubscription.pause();
+    }
+
     setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
+      if (_positionStreamSubscription.isPaused) {
+        _positionStreamSubscription.resume();
+      } else {
+        _positionStreamSubscription.pause();
+      }
     });
   }
 
   @override
+  void dispose() {
+    if (_positionStreamSubscription != null) {
+      _positionStreamSubscription.cancel();
+      _positionStreamSubscription = null;
+    }
+
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
-    return Scaffold(
-      appBar: AppBar(
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Invoke "debug painting" (press "p" in the console, choose the
-          // "Toggle Debug Paint" action from the Flutter Inspector in Android
-          // Studio, or the "Toggle Debug Paint" command in Visual Studio Code)
-          // to see the wireframe for each widget.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.display1,
-            ),
-          ],
+    return FutureBuilder<GeolocationStatus>(
+        future: Geolocator().checkGeolocationPermissionStatus(),
+        builder:
+            (BuildContext context, AsyncSnapshot<GeolocationStatus> snapshot) {
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (snapshot.data == GeolocationStatus.denied) {
+            return const PlaceholderWidget('Location services disabled',
+                'Enable location services for this App using the device settings.');
+          }
+
+          return _buildListView();
+        });
+  }
+
+  Widget _buildListView() {
+    final List<Widget> listItems = <Widget>[
+      ListTile(
+        title: RaisedButton(
+          child: _buildButtonText(),
+          color: _determineButtonColor(),
+          padding: const EdgeInsets.all(8.0),
+          onPressed: _toggleListening,
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
+    ];
+
+    listItems.addAll(_positions
+        .map((Position position) => PositionListItem(position))
+        .toList());
+
+    return ListView(
+      children: listItems,
+    );
+  }
+
+  bool _isListening() => !(_positionStreamSubscription == null ||
+      _positionStreamSubscription.isPaused);
+
+  Widget _buildButtonText() {
+    return Text(_isListening() ? 'Stop listening' : 'Start listening');
+  }
+
+  Color _determineButtonColor() {
+    return _isListening() ? Colors.red : Colors.green;
+  }
+}
+
+class PositionListItem extends StatefulWidget {
+  const PositionListItem(this._position);
+
+  final Position _position;
+
+  @override
+  State<PositionListItem> createState() => PositionListItemState(_position);
+}
+
+class PositionListItemState extends State<PositionListItem> {
+  PositionListItemState(this._position);
+
+  final Position _position;
+  String _address = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final Row row = Row(
+      children: <Widget>[
+        Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                'Lat: ${_position.latitude}',
+                style: const TextStyle(fontSize: 16.0, color: Colors.black),
+              ),
+              Text(
+                'Lon: ${_position.longitude}',
+                style: const TextStyle(fontSize: 16.0, color: Colors.black),
+              ),
+            ]),
+        Expanded(
+          child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  _position.timestamp.toLocal().toString(),
+                  style: const TextStyle(fontSize: 14.0, color: Colors.grey),
+                )
+              ]),
+        ),
+      ],
+    );
+
+    return ListTile(
+      onTap: _onTap,
+      title: row,
+      subtitle: Text(_address),
+    );
+  }
+
+  Future<void> _onTap() async {
+    String address = 'unknown';
+    final List<Placemark> placemarks = await Geolocator()
+        .placemarkFromCoordinates(_position.latitude, _position.longitude);
+
+    if (placemarks != null && placemarks.isNotEmpty) {
+      address = _buildAddressString(placemarks.first);
+    }
+
+    setState(() {
+      _address = '$address';
+    });
+  }
+
+  static String _buildAddressString(Placemark placemark) {
+    final String name = placemark.name ?? '';
+    final String city = placemark.locality ?? '';
+    final String state = placemark.administrativeArea ?? '';
+    final String country = placemark.country ?? '';
+    final Position position = placemark.position;
+
+    return '$name, $city, $state, $country\n$position';
+  }
+}
+
+class PlaceholderWidget extends StatelessWidget {
+  const PlaceholderWidget(this.title, this.message);
+
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: <Widget>[
+          Text(title,
+              style: const TextStyle(fontSize: 32.0, color: Colors.black54),
+              textAlign: TextAlign.center),
+          Text(message,
+              style: const TextStyle(fontSize: 16.0, color: Colors.black54),
+              textAlign: TextAlign.center),
+        ],
+      ),
     );
   }
 }
