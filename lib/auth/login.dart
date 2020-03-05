@@ -51,7 +51,7 @@ class _LoginPageState extends State<LoginPage> {
           backgroundColor: CupertinoTheme.of(context).primaryColor,
           textColor: Colors.white,
           fontSize: 16.0);
-      
+
       //Navigate then Change loading state to false
       await Navigator.push(context,
           CupertinoPageRoute(builder: (BuildContext context) => Home()));
