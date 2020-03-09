@@ -1,7 +1,10 @@
+// import 'dart:html';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:driver/uis/home.dart';
 
@@ -29,17 +32,25 @@ class _RegisterPageState extends State<RegisterPage> {
   Future<FirebaseUser> RegisterUser(
       {String email, String password, String gender}) async {
     try {
+      Position position = await Geolocator().getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
       await toggleLoadingState();
       await FirebaseAuth.instance
           .createUserWithEmailAndPassword(email: email, password: password);
       print("Registration successful");
-
+      var driver=await FirebaseAuth.instance.currentUser();
       //Add the user to firestore
-      await Firestore.instance.collection('driver').add({
+      await Firestore.instance.collection('drivers').document(driver.uid).setData({
         'name': FirstNameController.text + " " + LastNameController.text,
         'gender': gender,
-        'phonenumber': PhoneNumberController.text
+        'phonenumber': PhoneNumberController.text,
+        'latitude': position.latitude,
+        'longitude': position.longitude
       });
+      //Add the position to firestore
+      Firestore.instance
+          .collection('driverMarkers')
+          .document(driver.uid)
+          .setData({'latitude': position.latitude, 'longitude': position.longitude});
       //Navigate then Change loading state to false
       Navigator.push(context,
           CupertinoPageRoute(builder: (BuildContext context) => Home()));

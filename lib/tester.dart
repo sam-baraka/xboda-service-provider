@@ -1,93 +1,10 @@
-import 'dart:async';
-
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:driver/components/map_pin_pill.dart';
-import 'package:driver/models/pin_pill_info.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
-import 'package:flutter_rating/flutter_rating.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart';
-
-class Cab extends StatefulWidget {
-  @override
-  _CabState createState() => _CabState();
-}
-
-class _CabState extends State<Cab> {
-  var currentLatitude = -0.7161;
-  var currentLongitude = 37.1461;
-
-  //This method will get the realtime location updates
-  // void getRealtimeLocationUpdates() async {
-  //   StreamSubscription<Position> _positionStreamSubscription;
-  //   const LocationOptions locationOptions =
-  //       LocationOptions(accuracy: LocationAccuracy.high, distanceFilter: 2);
-  //   final Stream<Position> positionStream =
-  //       Geolocator().getPositionStream(locationOptions);
-  //   _positionStreamSubscription =
-  //       positionStream.listen((Position position) => setState(() {
-  //             // print(position.latitude);
-  //             currentLatitude = position.latitude;
-  //             currentLongitude = position.longitude;
-  //           }));
-  // }
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<GeolocationStatus>(
-        future: Geolocator().checkGeolocationPermissionStatus(),
-        builder:
-            (BuildContext context, AsyncSnapshot<GeolocationStatus> snapshot) {
-          if (!snapshot.hasData) {
-            return Center(child: CupertinoActivityIndicator());
-          }
-
-          if (snapshot.data == GeolocationStatus.denied) {
-            return CupertinoAlertDialog(
-              title: Text("Location permission denied"),
-              content: Text(
-                  "Please allow this app to use your location in settings"),
-              actions: <Widget>[
-                CupertinoActionSheetAction(
-                    onPressed: () {
-                      Navigator.pop(context);
-                    },
-                    isDestructiveAction: true,
-                    child: Text("Dismiss")),
-                CupertinoActionSheetAction(
-                    onPressed: () {
-                      Navigator.pop(context);
-                    },
-                    isDefaultAction: true,
-                    child: Text("Allow")),
-              ],
-            );
-          }
-          return CupertinoPageScaffold(
-            child: Stack(
-              children: <Widget>[
-                GoogleMap(
-                    myLocationEnabled: true,
-                    compassEnabled: true,
-                    initialCameraPosition: CameraPosition(
-                      target: LatLng(-0.7161, 37.1461),
-                      zoom: 10,
-                    ),
-                    markers: {
-                      Marker(
-                          markerId: null,
-                          position: LatLng(currentLatitude, currentLongitude))
-                    }),
-              ],
-            ),
-          );
-        });
-  }
-}
+import 'package:flutter/material.dart';
+import 'dart:async';
+import 'components/map_pin_pill.dart';
+import 'models/pin_pill_info.dart';
 
 const double CAMERA_ZOOM = 16;
 const double CAMERA_TILT = 80;
@@ -95,22 +12,22 @@ const double CAMERA_BEARING = 30;
 const LatLng SOURCE_LOCATION = LatLng(42.747932, -71.167889);
 const LatLng DEST_LOCATION = LatLng(37.335685, -122.0605916);
 
-class DriverHome extends StatefulWidget {
+// void main() =>
+//     runApp(MaterialApp(debugShowCheckedModeBanner: false, home: MapPage()));
+
+class MapPage extends StatefulWidget {
   @override
-  _DriverHomeState createState() => _DriverHomeState();
+  State<StatefulWidget> createState() => MapPageState();
 }
 
-class _DriverHomeState extends State<DriverHome> {
-  // var location=new Location();
-
-  @override
+class MapPageState extends State<MapPage> {
   Completer<GoogleMapController> _controller = Completer();
   Set<Marker> _markers = Set<Marker>();
 // for my drawn routes on the map
   Set<Polyline> _polylines = Set<Polyline>();
   List<LatLng> polylineCoordinates = [];
   PolylinePoints polylinePoints;
-  String googleAPIKey = 'AIzaSyC609B_WIP-xSXEWnauc4p-xGvV3draH2s';
+  String googleAPIKey = '<YOUR_API_KEY>';
 // for my custom marker pins
   BitmapDescriptor sourceIcon;
   BitmapDescriptor destinationIcon;
@@ -132,10 +49,8 @@ class _DriverHomeState extends State<DriverHome> {
   PinInformation destinationPinInfo;
 
   @override
-  void initState() async {
+  void initState() {
     super.initState();
-    //Firebase user
-    var driver = await FirebaseAuth.instance.currentUser();
 
     // create an instance of Location
     location = new Location();
@@ -146,18 +61,9 @@ class _DriverHomeState extends State<DriverHome> {
     location.onLocationChanged().listen((LocationData cLoc) {
       // cLoc contains the lat and long of the
       // current user's position in real time,
-
       // so we're holding on to it
       currentLocation = cLoc;
       updatePinOnMap();
-//Update markers on firestore
-      Firestore.instance
-          .collection('driverMarkers')
-          .document(driver.uid)
-          .updateData({'latitude': cLoc.latitude, 'longitude': cLoc.longitude}).whenComplete((){
-            print("Changed location to $cLoc.latitude,$cLoc.longitude, yessir!!!");
-          });
-      
     });
     // set custom marker pins
     setSourceAndDestinationIcons();
@@ -204,18 +110,18 @@ class _DriverHomeState extends State<DriverHome> {
       body: Stack(
         children: <Widget>[
           GoogleMap(
-              myLocationEnabled: true,
+              // myLocationEnabled: true,
               compassEnabled: true,
-              tiltGesturesEnabled: false,
+              // tiltGesturesEnabled: false,
               markers: _markers,
               polylines: _polylines,
-              mapType: MapType.normal,
+              mapType: MapType.hybrid,
               initialCameraPosition: initialCameraPosition,
               onTap: (LatLng loc) {
                 pinPillPosition = -100;
               },
               onMapCreated: (GoogleMapController controller) {
-                // controller.setMapStyle(Utils.mapStyles);
+                controller.setMapStyle(Utils.mapStyles);
                 _controller.complete(controller);
                 // my map has completed being created;
                 // i'm ready to show the pins on the map
@@ -308,7 +214,7 @@ class _DriverHomeState extends State<DriverHome> {
     // follows the pin as it moves with an animation
     CameraPosition cPosition = CameraPosition(
       zoom: CAMERA_ZOOM,
-      tilt: CAMERA_TILT,
+      // tilt: CAMERA_TILT,
       bearing: CAMERA_BEARING,
       target: LatLng(currentLocation.latitude, currentLocation.longitude),
     );
@@ -340,165 +246,165 @@ class _DriverHomeState extends State<DriverHome> {
   }
 }
 
-// class Utils {
-//   static String mapStyles = '''[
-//   {
-//     "elementType": "geometry",
-//     "stylers": [
-//       {
-//         "color": "#f5f5f5"
-//       }
-//     ]
-//   },
-//   {
-//     "elementType": "labels.icon",
-//     "stylers": [
-//       {
-//         "visibility": "off"
-//       }
-//     ]
-//   },
-//   {
-//     "elementType": "labels.text.fill",
-//     "stylers": [
-//       {
-//         "color": "#616161"
-//       }
-//     ]
-//   },
-//   {
-//     "elementType": "labels.text.stroke",
-//     "stylers": [
-//       {
-//         "color": "#f5f5f5"
-//       }
-//     ]
-//   },
-//   {
-//     "featureType": "administrative.land_parcel",
-//     "elementType": "labels.text.fill",
-//     "stylers": [
-//       {
-//         "color": "#bdbdbd"
-//       }
-//     ]
-//   },
-//   {
-//     "featureType": "poi",
-//     "elementType": "geometry",
-//     "stylers": [
-//       {
-//         "color": "#eeeeee"
-//       }
-//     ]
-//   },
-//   {
-//     "featureType": "poi",
-//     "elementType": "labels.text.fill",
-//     "stylers": [
-//       {
-//         "color": "#757575"
-//       }
-//     ]
-//   },
-//   {
-//     "featureType": "poi.park",
-//     "elementType": "geometry",
-//     "stylers": [
-//       {
-//         "color": "#e5e5e5"
-//       }
-//     ]
-//   },
-//   {
-//     "featureType": "poi.park",
-//     "elementType": "labels.text.fill",
-//     "stylers": [
-//       {
-//         "color": "#9e9e9e"
-//       }
-//     ]
-//   },
-//   {
-//     "featureType": "road",
-//     "elementType": "geometry",
-//     "stylers": [
-//       {
-//         "color": "#ffffff"
-//       }
-//     ]
-//   },
-//   {
-//     "featureType": "road.arterial",
-//     "elementType": "labels.text.fill",
-//     "stylers": [
-//       {
-//         "color": "#757575"
-//       }
-//     ]
-//   },
-//   {
-//     "featureType": "road.highway",
-//     "elementType": "geometry",
-//     "stylers": [
-//       {
-//         "color": "#dadada"
-//       }
-//     ]
-//   },
-//   {
-//     "featureType": "road.highway",
-//     "elementType": "labels.text.fill",
-//     "stylers": [
-//       {
-//         "color": "#616161"
-//       }
-//     ]
-//   },
-//   {
-//     "featureType": "road.local",
-//     "elementType": "labels.text.fill",
-//     "stylers": [
-//       {
-//         "color": "#9e9e9e"
-//       }
-//     ]
-//   },
-//   {
-//     "featureType": "transit.line",
-//     "elementType": "geometry",
-//     "stylers": [
-//       {
-//         "color": "#e5e5e5"
-//       }
-//     ]
-//   },
-//   {
-//     "featureType": "transit.station",
-//     "elementType": "geometry",
-//     "stylers": [
-//       {
-//         "color": "#eeeeee"
-//       }
-//     ]
-//   },
-//   {
-//     "featureType": "water",
-//     "elementType": "geometry",
-//     "stylers": [
-//       {
-//         "color": "#c9c9c9"
-//       }
-//     ]
-//   },
-//   {
-//     "featureType": "water",
-//     "elementType": "labels.text.fill",
-//     "stylers": [
-//       {
-//         "color": "#9e9e9e"
-//       }
-//     ]
-//   }
-// ]''';
-// }
+class Utils {
+  static String mapStyles = '''[
+  {
+    "elementType": "geometry",
+    "stylers": [
+      {
+        "color": "#f5f5f5"
+      }
+    ]
+  },
+  {
+    "elementType": "labels.icon",
+    "stylers": [
+      {
+        "visibility": "off"
+      }
+    ]
+  },
+  {
+    "elementType": "labels.text.fill",
+    "stylers": [
+      {
+        "color": "#616161"
+      }
+    ]
+  },
+  {
+    "elementType": "labels.text.stroke",
+    "stylers": [
+      {
+        "color": "#f5f5f5"
+      }
+    ]
+  },
+  {
+    "featureType": "administrative.land_parcel",
+    "elementType": "labels.text.fill",
+    "stylers": [
+      {
+        "color": "#bdbdbd"
+      }
+    ]
+  },
+  {
+    "featureType": "poi",
+    "elementType": "geometry",
+    "stylers": [
+      {
+        "color": "#eeeeee"
+      }
+    ]
+  },
+  {
+    "featureType": "poi",
+    "elementType": "labels.text.fill",
+    "stylers": [
+      {
+        "color": "#757575"
+      }
+    ]
+  },
+  {
+    "featureType": "poi.park",
+    "elementType": "geometry",
+    "stylers": [
+      {
+        "color": "#e5e5e5"
+      }
+    ]
+  },
+  {
+    "featureType": "poi.park",
+    "elementType": "labels.text.fill",
+    "stylers": [
+      {
+        "color": "#9e9e9e"
+      }
+    ]
+  },
+  {
+    "featureType": "road",
+    "elementType": "geometry",
+    "stylers": [
+      {
+        "color": "#ffffff"
+      }
+    ]
+  },
+  {
+    "featureType": "road.arterial",
+    "elementType": "labels.text.fill",
+    "stylers": [
+      {
+        "color": "#757575"
+      }
+    ]
+  },
+  {
+    "featureType": "road.highway",
+    "elementType": "geometry",
+    "stylers": [
+      {
+        "color": "#dadada"
+      }
+    ]
+  },
+  {
+    "featureType": "road.highway",
+    "elementType": "labels.text.fill",
+    "stylers": [
+      {
+        "color": "#616161"
+      }
+    ]
+  },
+  {
+    "featureType": "road.local",
+    "elementType": "labels.text.fill",
+    "stylers": [
+      {
+        "color": "#9e9e9e"
+      }
+    ]
+  },
+  {
+    "featureType": "transit.line",
+    "elementType": "geometry",
+    "stylers": [
+      {
+        "color": "#e5e5e5"
+      }
+    ]
+  },
+  {
+    "featureType": "transit.station",
+    "elementType": "geometry",
+    "stylers": [
+      {
+        "color": "#eeeeee"
+      }
+    ]
+  },
+  {
+    "featureType": "water",
+    "elementType": "geometry",
+    "stylers": [
+      {
+        "color": "#c9c9c9"
+      }
+    ]
+  },
+  {
+    "featureType": "water",
+    "elementType": "labels.text.fill",
+    "stylers": [
+      {
+        "color": "#9e9e9e"
+      }
+    ]
+  }
+]''';
+}
